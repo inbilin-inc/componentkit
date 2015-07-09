@@ -29,6 +29,11 @@ static NSString *_debugResponderChain(id responder) {
 
 void CKComponentActionSend(CKComponentAction action, CKComponent *sender, id context, CKComponentActionSendBehavior behavior)
 {
+  if (!sender) {
+//      由于某种原因，control的ck_component为nil，即控件与component没有建立关联
+//      此时后续操作无效，因此直接返回
+    return;
+  }
   id initialResponder = (behavior == CKComponentActionSendBehaviorStartAtSender) ? sender : [sender nextResponder];
   id responder = [initialResponder targetForAction:action withSender:sender];
   CKCAssertNotNil(responder, @"Unhandled component action %@ following responder chain %@",
