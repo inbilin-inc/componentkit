@@ -28,7 +28,6 @@ static const CGFloat CKTextKitRendererTextCapHeightPadding = 1.3;
   __block NSArray *textRects = @[];
   [self.context performBlockWithLockedTextKitComponents:^(NSLayoutManager *layoutManager, NSTextStorage *textStorage, NSTextContainer *textContainer) {
     BOOL textRangeIsValid = (NSMaxRange(textRange) <= [textStorage length]);
-    CKCAssertTrue(textRangeIsValid);
     if (!textRangeIsValid) {
       return;
     }
