@@ -176,10 +176,19 @@ static NSString *const kReuseIdentifier = @"com.component_kit.collection_view_da
           hasChangesOfTypes:(CKComponentDataSourceChangeType)changeTypes
         changesetApplicator:(ck_changeset_applicator_t)changesetApplicator
 {
+  __block NSArray *itemRemovalIndexPaths = nil;
+  __block NSArray *itemInsertionIndexPaths = nil;
+  __block NSArray *itemUpdateIndexPaths = nil;
   [_collectionView performBatchUpdates:^{
     const auto &changeset = changesetApplicator();
-    applyChangesetToCollectionView(changeset, _collectionView);
-  } completion:nil];
+//    applyChangesetToCollectionView(changeset, _collectionView);
+
+      applyChangesetToCollectionView(changeset, _collectionView, &itemRemovalIndexPaths, &itemInsertionIndexPaths, &itemUpdateIndexPaths);
+  } completion:^(BOOL finished) {
+      if (self.changesetApplyCompletionBlock) {
+          self.changesetApplyCompletionBlock(itemRemovalIndexPaths, itemInsertionIndexPaths, itemUpdateIndexPaths, finished);
+      }
+  }];
 }
 
 - (void)componentDataSource:(CKComponentDataSource *)componentDataSource
@@ -198,55 +207,70 @@ static NSString *const kReuseIdentifier = @"com.component_kit.collection_view_da
 
 #pragma mark - Private
 
+static void applyChangesetToCollectionView(const Output::Changeset &changeset, UICollectionView *collectionView, NSArray **theItemRemovalIndexPaths, NSArray **theItemInsertionIndexPaths, NSArray **theItemUpdateIndexPaths)
+{
+    NSMutableArray *itemRemovalIndexPaths = [[NSMutableArray alloc] init];
+    NSMutableArray *itemInsertionIndexPaths = [[NSMutableArray alloc] init];
+    NSMutableArray *itemUpdateIndexPaths = [[NSMutableArray alloc] init];
+    Output::Items::Enumerator itemEnumerator =
+    ^(const Output::Change &change, CKArrayControllerChangeType type, BOOL *stop) {
+        switch (type) {
+            case CKArrayControllerChangeTypeDelete:
+                [itemRemovalIndexPaths addObject:change.sourceIndexPath.toNSIndexPath()];
+                break;
+            case CKArrayControllerChangeTypeInsert:
+                [itemInsertionIndexPaths addObject:change.destinationIndexPath.toNSIndexPath()];
+                break;
+            case CKArrayControllerChangeTypeUpdate:
+                [itemUpdateIndexPaths addObject:change.sourceIndexPath.toNSIndexPath()];
+                break;
+            default:
+                CKCFailAssert(@"Unsupported change type for items: %d", type);
+                break;
+        }
+    };
+    
+    Sections::Enumerator sectionsEnumerator = ^(NSIndexSet *sectionIndexes, CKArrayControllerChangeType type, BOOL *stop) {
+        if (sectionIndexes.count > 0) {
+            switch (type) {
+                case CKArrayControllerChangeTypeDelete:
+                    [collectionView deleteSections:sectionIndexes];
+                    break;
+                case CKArrayControllerChangeTypeInsert:
+                    [collectionView insertSections:sectionIndexes];
+                    break;
+                default:
+                    CKCFailAssert(@"Unsuported change type for sections %d", type);
+                    break;
+            }
+        }
+    };
+    
+    changeset.enumerate(sectionsEnumerator, itemEnumerator);
+    if (itemRemovalIndexPaths.count > 0) {
+        [collectionView deleteItemsAtIndexPaths:itemRemovalIndexPaths];
+    }
+    if (itemUpdateIndexPaths.count > 0) {
+        [collectionView reloadItemsAtIndexPaths:itemUpdateIndexPaths];
+    }
+    if (itemInsertionIndexPaths.count > 0) {
+        [collectionView insertItemsAtIndexPaths:itemInsertionIndexPaths];
+    }
+    
+    if (theItemRemovalIndexPaths) {
+        *theItemRemovalIndexPaths = itemRemovalIndexPaths;
+    }
+    if (theItemInsertionIndexPaths) {
+        *theItemInsertionIndexPaths = itemInsertionIndexPaths;
+    }
+    if (theItemUpdateIndexPaths) {
+        *theItemUpdateIndexPaths = itemUpdateIndexPaths;
+    }
+}
+
 static void applyChangesetToCollectionView(const Output::Changeset &changeset, UICollectionView *collectionView)
 {
-  NSMutableArray *itemRemovalIndexPaths = [[NSMutableArray alloc] init];
-  NSMutableArray *itemInsertionIndexPaths = [[NSMutableArray alloc] init];
-  NSMutableArray *itemUpdateIndexPaths = [[NSMutableArray alloc] init];
-  Output::Items::Enumerator itemEnumerator =
-  ^(const Output::Change &change, CKArrayControllerChangeType type, BOOL *stop) {
-    switch (type) {
-      case CKArrayControllerChangeTypeDelete:
-        [itemRemovalIndexPaths addObject:change.sourceIndexPath.toNSIndexPath()];
-        break;
-      case CKArrayControllerChangeTypeInsert:
-        [itemInsertionIndexPaths addObject:change.destinationIndexPath.toNSIndexPath()];
-        break;
-      case CKArrayControllerChangeTypeUpdate:
-        [itemUpdateIndexPaths addObject:change.sourceIndexPath.toNSIndexPath()];
-        break;
-      default:
-        CKCFailAssert(@"Unsupported change type for items: %d", type);
-        break;
-    }
-  };
-  
-  Sections::Enumerator sectionsEnumerator = ^(NSIndexSet *sectionIndexes, CKArrayControllerChangeType type, BOOL *stop) {
-    if (sectionIndexes.count > 0) {
-      switch (type) {
-        case CKArrayControllerChangeTypeDelete:
-          [collectionView deleteSections:sectionIndexes];
-          break;
-        case CKArrayControllerChangeTypeInsert:
-          [collectionView insertSections:sectionIndexes];
-          break;
-        default:
-          CKCFailAssert(@"Unsuported change type for sections %d", type);
-          break;
-      }
-    }
-  };
-  
-  changeset.enumerate(sectionsEnumerator, itemEnumerator);
-  if (itemRemovalIndexPaths.count > 0) {
-    [collectionView deleteItemsAtIndexPaths:itemRemovalIndexPaths];
-  }
-  if (itemUpdateIndexPaths.count > 0) {
-    [collectionView reloadItemsAtIndexPaths:itemUpdateIndexPaths];
-  }
-  if (itemInsertionIndexPaths.count > 0) {
-    [collectionView insertItemsAtIndexPaths:itemInsertionIndexPaths];
-  }
+    applyChangesetToCollectionView(changeset, collectionView, nil, nil, nil);
 }
 
 @end

@@ -20,6 +20,7 @@
 @protocol CKSupplementaryViewDataSource;
 
 typedef void(*CKCellConfigurationFunction)(UICollectionViewCell *cell, NSIndexPath *indexPath, id<NSObject> model);
+typedef void (^CKCollectionViewChangesetApplyComplectionBlock) (NSArray *itemRemovalIndexPaths, NSArray *itemInsertionIndexPaths, NSArray *itemUpdateIndexPaths, BOOL finished);
 
 /**
  This class is an implementation of a `UICollectionViewDataSource` that can be used along with components. For each set of changes (i.e insertion/deletion/update
@@ -109,6 +110,8 @@ typedef void(*CKCellConfigurationFunction)(UICollectionViewCell *cell, NSIndexPa
  `collectionView:viewForSupplementaryElementOfKind:atIndexPath` to this object.
  */
 @property (readonly, nonatomic, weak) id<CKSupplementaryViewDataSource> supplementaryViewDataSource;
+
+@property (copy, nonatomic) CKCollectionViewChangesetApplyComplectionBlock changesetApplyCompletionBlock;
 
 - (instancetype)init CK_NOT_DESIGNATED_INITIALIZER_ATTRIBUTE;
 
